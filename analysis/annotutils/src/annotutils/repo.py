@@ -1,3 +1,4 @@
+import contextlib
 import os
 import pathlib
 import subprocess
@@ -36,3 +37,14 @@ def repo_root() -> pathlib.Path:
 
 def data_dir() -> pathlib.Path:
     return repo_root() / "analysis" / "data"
+
+
+# contextlib.chdir only available in python3.11
+@contextlib.contextmanager
+def chdir(target_directory: pathlib.Path):
+    previous_directory = pathlib.Path.cwd()
+    os.chdir(target_directory)
+    try:
+        yield
+    finally:
+        os.chdir(previous_directory)

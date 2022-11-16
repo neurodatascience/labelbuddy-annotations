@@ -1,5 +1,15 @@
 title: Neuroimaging literature annotations
-author: https://github.com/neurodatascience/labelbuddy-annotations/graphs/contributors
+author: "https://github.com/neurodatascience/labelbuddy-annotations/graphs/contributors"
+
+parse:
+  myst_substitutions:
+    labelbuddy_home: "[labelbuddy](https://jeromedockes.github.io/labelbuddy/)"
+    lb: "**labelbuddy**"
+    pmc_home: "[PubMedCentral](https://www.ncbi.nlm.nih.gov/pmc/)"
+    pubget_home: "[pubget](https://neuroquery.github.io/pubget/)"
+    repo_blob_url: "https://github.com/neurodatascience/labelbuddy-annotations/blob/main/"
+    repo_tree_url: "https://github.com/neurodatascience/labelbuddy-annotations/tree/main/"
+    repo_url: "https://github.com/neurodatascience/labelbuddy-annotations/"
 
 execute:
   execute_notebooks: force
@@ -12,7 +22,7 @@ bibtex_bibfiles:
   - references.bib
 
 repository:
-  url: https://github.com/neurodatascience/labelbuddy-annotations
+  url: "https://github.com/neurodatascience/labelbuddy-annotations"
   path_to_book: analysis/book
   branch: main
 
@@ -23,6 +33,6 @@ html:
 sphinx:
   config:
     nb_custom_formats:
-        .py:
-            - jupytext.reads
-            - fmt: py
+      .py:
+        - jupytext.reads
+        - fmt: py
