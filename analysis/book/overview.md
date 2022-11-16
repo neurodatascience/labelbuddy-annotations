@@ -52,7 +52,13 @@ Here is an example document (the text is abbreviated for clarity):
 :tags: [remove-input, output_scroll]
 import json
 
-docs_file = repo.repo_root() / "projects" / "participant_demographics" / "documents" / "documents_00001.jsonl"
+docs_file = (
+    repo.repo_root()
+    / "projects"
+    / "participant_demographics"
+    / "documents"
+    / "documents_00001.jsonl"
+)
 with open(docs_file, encoding="utf-8") as stream:
     doc = json.loads(next(stream))
 doc["text"] = f"{doc['text'][:70]} [ … ]"
@@ -67,12 +73,15 @@ from annotutils import database
 
 connection = database.get_database_connection()
 
-document_count = connection.execute("select count(*) from document").fetchone()[0]
+document_count = connection.execute(
+    "select count(*) from document"
+).fetchone()[0]
 myst_nb.glue("document_count", document_count)
 
-annotated_document_count = connection.execute("select count(*) from (select distinct doc_id from annotation)").fetchone()[0]
+annotated_document_count = connection.execute(
+    "select count(*) from (select distinct doc_id from annotation)"
+).fetchone()[0]
 myst_nb.glue("annotated_document_count", annotated_document_count)
-
 ```
 There are currently {glue:}`document_count` documents in the repository, {glue:}`annotated_document_count` of which are annotated (more details below).
 
@@ -86,97 +95,80 @@ Here is an example:
 ```{code-cell}
 :tags: [remove-input, output_scroll]
 
-labels_file = repo.repo_root() / "projects" / "participant_demographics" / "labels" / "labels_n_participants.json"
+labels_file = (
+    repo.repo_root()
+    / "projects"
+    / "participant_demographics"
+    / "labels"
+    / "labels_n_participants.json"
+)
 print(labels_file.read_text("utf-8"))
 ```
 
 ## Annotations
 
 Finally, an annotation is the association of a label to a portion of a document's text.
-It is thus 
-+++
-
-The data in this repository is in the `projects/` directory and divided into
-projects, each of which contains separate directories for `documents/`,
-`labels/` and `annotations/`.
-
-Labels are stored in JSON files and documents and annotations are stored in
-JSONLines files (one JSON document per line). To load and analyze these
-annotations, we can read these files, or we can use the
-`scripts/make_database.py` script to collect all data in a SQLite database
-(by default in `analysis/data/database.sqlite3`).
-
-Once this is done, we can open a connection to the database to easily obtain
-information about labels, documents and annotations contained in this
-repository as shown below.
-
-+++
-
-## Total number of annotations in the repository
-
-+++
-
-We can use the `annotutils` package provided in this repository, in
-`analysis/annotutils/`, to create the annotations database if necessary and
-obtain a connection from Python scripts.
-
-Install it with `pip install -e analysis/annotutils`
-
-```{code-cell}
-from annotutils import database
-
-connection = database.get_database_connection()
-n_annotations = connection.execute(
-    "SELECT COUNT(*) AS n_annotations FROM annotation"
-).fetchone()["n_annotations"]
-
-print(f"There are {n_annotations} annotations in the database.")
-```
+It thus consists of a label name and the character positions where it starts and ends.
 
 Here are a few example annotations:
 
 ```{code-cell}
+:tags: [remove-input]
 from annotutils import displays
 
 displays.AnnotationsDisplay(
     connection.execute(
-        "SELECT * FROM detailed_annotation WHERE project = 'autism_mri' LIMIT 7"
+        "select * from detailed_annotation order by project limit 10;"
     ).fetchall()
 )
 ```
 
-## Count label occurrences in each project
+```{code-cell}
+:tags: [remove-cell]
+annotation_count = connection.execute(
+    "SELECT COUNT(*) AS annotation_count FROM annotation"
+).fetchone()["annotation_count"]
+myst_nb.glue("annotation_count", annotation_count)
+```
 
-+++
+In total there are {glue:}`annotation_count` annotations in the repository.
 
-This illustrates collecting the results of a query in a pandas DataFrame for
-further processing, plotting etc.
+## Number of labelled documents by project
 
-+++
-
-We first query the database to obtain how many times each label was used in
-each project, and store the results in a DataFrame.
+Now, we display the number of documents annotated with each label in the different projects:
 
 ```{code-cell}
+:tags: [remove-cell]
 import pandas as pd
 
 label_counts = pd.read_sql(
     """
-    SELECT project, label.name AS label_name, COUNT(*) AS n_annotations
-      FROM annotation
-      INNER JOIN label ON annotation.label_id = label.id
+      with annot as
+      (select distinct label_id, doc_id, project from annotation)
+    SELECT project, label.name AS label_name, label.color as color, COUNT(*) AS n_docs
+    from
+      annot
+      INNER JOIN label ON annot.label_id = label.id
+      INNER JOIN document ON annot.doc_id = document.id
       GROUP BY project, label_name
-      ORDER BY n_annotations DESC
+      ORDER BY n_docs DESC
     """,
     connection,
 )
-label_counts.head()
+
+project_counts = pd.read_sql(
+    """
+    select project, count(*) as n_docs
+      from (select distinct project, doc_id from annotation)
+      group by project
+    """,
+    connection,
+).set_index("project")["n_docs"]
 ```
 
-Next, for each project we display the number of times each label was used in
-a bar plot.
 
 ```{code-cell}
+:tags: [remove-input]
 from matplotlib import pyplot as plt
 import seaborn as sns
 
@@ -185,11 +177,12 @@ projects = label_counts.groupby("project")
 for project_name, data in projects:
     fig, ax = plt.subplots(figsize=(4, data.shape[0] / 3))
     sns.barplot(
-        data=data, x="n_annotations", y="label_name", ax=ax, color="blue"
+        data=data, x="n_docs", y="label_name", ax=ax, color="blue"
     )
     ax.set_title(
-        f'“{project_name}” project ({data["n_annotations"].sum()} annotations)'
+        f'“{project_name}” project ({project_counts[project_name]} annotated documents)'
     )
     ax.set_ylabel("")
+    ax.set_xlabel("Number of documents annotated with this label")
     sns.despine()
 ```
